@@ -216,7 +216,7 @@ def preprocess_product_dim(product_dim):
 def create_data_full_year(fhs_sales_flat_order_item_state, sku_list, index):
         """
         Tạo ra data cho toàn bộ năm trên 1 sku từ index trong sku_list
-        
+
         Input: 
             fhs_sales_flat_order_item_state: Dataframe
             sku_list: list []
@@ -245,21 +245,23 @@ def create_data_full_year(fhs_sales_flat_order_item_state, sku_list, index):
 
         return result
           
-def get_epoch_data_15_days(data_full_year, model, day_train = 15, day_predict = 7):
+def get_epoch_data_k_days(data_full_year, model, day_train = 15, day_predict = 7):
     """
     Chọn tất cả các ngày trong năm hay có thể gọi là epoch cho từng năm, 
-    sau đó trả ra dữ liệu 15 ngày trước đó và dữ liệu 7 ngày sau là một array 2 chiều
+    sau đó trả ra dữ liệu day_train ngày trước đó và dữ liệu day_predict ngày sau là một array 2 chiều
 
     Input:
         data_full_year: Dataframe
         model: model sentence to vec vietnamese-sbert
     Return:
-        data_array: numpy array shape (344 or 345, 792). Trong đó 344 là số ngày trong năm, 
-            792 là số chiều 768 + 1 + 1 + 15 + 7 = 785 + 7. Note: 785 là dự liệu train, 7 là nhãn
+        data_array:2D numpy array (x, y). Trong đó x là số ngày trong năm valid có nhãn, 
+            y là số chiều 768 + 1 + 1 + day_train + day_predict = y. 
+            Note: 768 là vector wordembedding, day_train là số ngày dùng để train, 
+            day_predict số ngày dự đoán
 
     """
 
-    # Lấy từng khoảng gồm 22 ngày, với 15 ngày train 7 ngày dự đoán
+    # Lấy từng khoảng gồm day_train + day_predict ngày, với day_train ngày train day_predict ngày dự đoán
     data_list = []
     offset = day_train + day_predict
     for i in range(len(data_full_year) - offset + 1):
@@ -308,43 +310,43 @@ def random_data_15_days(data_full_year, year):
     return df.iloc[:15], df.iloc[15:]
     pass
 
-def format_data(data_15_days, data_7_days, model):
+def format_data(data_k_days, data_l_days, model):
     """
     Chuyển data về toàn là số để có thể train dễ dàng
-    Cấu trúc data: data_15_days = (số đơn bán trong 15 ngày, ngày, tháng, 768 word embedding cho category)
-    Cấu trúc label: data_7_days = (số đơn bán trong 7 ngày từ kế tiếp)
+    Cấu trúc data: data_k_days = (số đơn bán trong k ngày, ngày, tháng, 768 word embedding cho category)
+    Cấu trúc label: data_l_days = (số đơn bán trong l ngày từ kế tiếp)
 
     Input:
-        data_15_days: Dataframe
-        data_7_days: Dataframe
+        data_k_days: Dataframe
+        data_l_days: Dataframe
         model: model sentence to vec vietnamese-sbert
     Return:
-        data_15_days: numpy array (785 = 768 + 15 + 1 + 1)
-        data_7_days: numpy array (7)
+        data_k_days: numpy array (768 + k + 1 + 1)
+        data_l_days: numpy array (l)
     """
 
     # Lấy max date và bỏ các số lựng bán từng ngày vào 1 list, tiến hành xử lí và lấy các cột cần thiết
-    data_15_days = data_15_days.groupby(['product_dim.sku', 'product_dim.cat'])[['date', 'count']].agg([max, list]).reset_index()
-    data_15_days.columns = ['%s%s' % (a, '|%s' % b if b else '') for a, b in data_15_days.columns]
-    data_15_days = data_15_days.loc[:, ['product_dim.cat', 'date|max','count|list']]
-    data_15_days['day'] = data_15_days['date|max'].dt.day
-    data_15_days['month'] = data_15_days['date|max'].dt.month
-    data_15_days = data_15_days.loc[:, ['product_dim.cat','count|list','day','month']]
-    data_15_days.columns = ['product_dim.cat','sale_15_days','day', 'month']
+    data_k_days = data_k_days.groupby(['product_dim.sku', 'product_dim.cat'])[['date', 'count']].agg([max, list]).reset_index()
+    data_k_days.columns = ['%s%s' % (a, '|%s' % b if b else '') for a, b in data_k_days.columns]
+    data_k_days = data_k_days.loc[:, ['product_dim.cat', 'date|max','count|list']]
+    data_k_days['day'] = data_k_days['date|max'].dt.day
+    data_k_days['month'] = data_k_days['date|max'].dt.month
+    data_k_days = data_k_days.loc[:, ['product_dim.cat','count|list','day','month']]
+    data_k_days.columns = ['product_dim.cat','sale_k_days','day', 'month']
 
     # Sau đó chuyển về numpy array
-    sale_15_days = data_15_days['sale_15_days'].apply(np.array)[0]
-    day = data_15_days['day'].apply(np.array)
-    month = data_15_days['month'].apply(np.array)
-    vector_sentence = model.encode(data_15_days['product_dim.cat'])[0]
+    sale_15_days = data_k_days['sale_k_days'].apply(np.array)[0]
+    day = data_k_days['day'].apply(np.array)
+    month = data_k_days['month'].apply(np.array)
+    vector_sentence = model.encode(data_k_days['product_dim.cat'])[0]
     # Chỉ lấy thông tin về số lượng bán
-    data_7_days = data_7_days['count'].to_numpy()
+    data_l_days = data_l_days['count'].to_numpy()
 
     # data_15_days = np.concatenate((sale_15_days, day, month, vector_sentence), axis = 0)
-    data = np.concatenate((sale_15_days, day, month, vector_sentence, data_7_days), axis = 0)
+    data = np.concatenate((sale_15_days, day, month, vector_sentence, data_l_days), axis = 0)
 
 
     return data
-    return data_15_days, data_7_days
+    return data_k_days, data_l_days
 
     pass

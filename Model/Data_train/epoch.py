@@ -32,7 +32,7 @@ def create_epoch():
                     data_full_year  = \
                               ulti.create_data_full_year(fhs_sales_flat_order_item_state_2020, sku_list, index)
 
-                    data = ulti.get_epoch_data_15_days(data_full_year, vietnamese_sbert, day_train = 15, day_predict = 1)
+                    data = ulti.get_epoch_data_k_days(data_full_year, vietnamese_sbert, day_train = 15, day_predict = 1)
 
                     data_full_sku.append(data)
 
