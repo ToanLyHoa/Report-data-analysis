@@ -335,7 +335,7 @@ def format_data(data_k_days, data_l_days, model):
     data_k_days.columns = ['product_dim.cat','sale_k_days','day', 'month']
 
     # Sau đó chuyển về numpy array
-    sale_15_days = data_k_days['sale_k_days'].apply(np.array)[0]
+    sale_k_days = data_k_days['sale_k_days'].apply(np.array)[0]
     day = data_k_days['day'].apply(np.array)
     month = data_k_days['month'].apply(np.array)
     vector_sentence = model.encode(data_k_days['product_dim.cat'])[0]
@@ -343,7 +343,7 @@ def format_data(data_k_days, data_l_days, model):
     data_l_days = data_l_days['count'].to_numpy()
 
     # data_15_days = np.concatenate((sale_15_days, day, month, vector_sentence), axis = 0)
-    data = np.concatenate((sale_15_days, day, month, vector_sentence, data_l_days), axis = 0)
+    data = np.concatenate((sale_k_days, day, month, vector_sentence, data_l_days), axis = 0)
 
 
     return data
