@@ -345,7 +345,6 @@ def format_data(data_k_days, data_l_days, model):
     # data_15_days = np.concatenate((sale_15_days, day, month, vector_sentence), axis = 0)
     data = np.concatenate((sale_k_days, day, month, vector_sentence, data_l_days), axis = 0)
 
-
     return data
     return data_k_days, data_l_days
 

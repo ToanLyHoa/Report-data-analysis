@@ -1,9 +1,8 @@
-from data import prepare_data 
-from . import ulti 
 import pandas as pd
-import torch        
 from sentence_transformers import SentenceTransformer
 import numpy as np
+from . import data 
+from . import ulti 
 
 
 def create_epoch():
@@ -28,18 +27,22 @@ def create_epoch():
           data_full_sku = []
 
           # Xử lí số chiều của data và nhãn
-          day_train = 30
-          day_predict = 7
+          day_train = 15
+          day_predict = 1
           word_embedding = 768
-          data = word_embedding + 2 + day_train
+          data_dimension = word_embedding + 2 + day_train
 
 
-          for index in range(len(sku_list)):
+          for index in range(1):
                     data_full_year  = \
                               ulti.create_data_full_year(fhs_sales_flat_order_item_state_2020, sku_list, index)
 
+                    print(data_full_year)
+
                     data = ulti.get_epoch_data_k_days(data_full_year, vietnamese_sbert, 
                               day_train = day_train, day_predict = day_predict)
+
+                    print(data)
 
                     data_full_sku.append(data)
 
@@ -47,5 +50,5 @@ def create_epoch():
           data_full_sku = np.concatenate(data_full_sku, axis = 0)
 
           # Ở đây ta set cứng 15 ngày nên phần nhãn sẽ tính từ 785 đến sau
-          return data_full_sku[:, :data], data_full_sku[:, data:]
+          return data_full_sku[:, :data_dimension], data_full_sku[:, data_dimension:]
 

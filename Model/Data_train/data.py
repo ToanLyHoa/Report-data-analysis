@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
-from spicy import stats
 from . import ulti
 
 # Đường dẫn của fhs_sales_flat_order
