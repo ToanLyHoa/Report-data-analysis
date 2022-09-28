@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 def rename_columns(dataframe, dataframe_name):
     """
     rename columns with patern: dataframe_name.columns_name
@@ -18,6 +19,7 @@ def rename_columns(dataframe, dataframe_name):
     
     dataframe.columns = new_names
 
+
 def string_to_datetime(dataframe, column_name):
           """
           Change string columns to datetime columns
@@ -29,6 +31,7 @@ def string_to_datetime(dataframe, column_name):
           dataframe[f'{column_name}'] \
                     = pd.to_datetime(dataframe[f'{column_name}'],
                                         format = '%Y/%m/%d %H:%M:%S')
+
 
 def create_order_item_df(fhs_sales_flat_order, fhs_sales_flat_order_item, product_dim, year = 2020):
           """
@@ -79,60 +82,117 @@ def create_order_item_df(fhs_sales_flat_order, fhs_sales_flat_order_item, produc
 
           return fhs_sales_flat_order_item_state_2020
 
-def preprocess_order_item(fhs_sales_flat_order_item_state, threshold_amount = 300, threshold_month = 3):
-          """
-          Tiền xử lí với fhs_sales_flat_order_item_state, loại các sản phẩm bán ít hơn 
-          threshold_amount sản phẩm, loại các sản phẩm có thời gian bán ít hơn threshold_month tháng,
-          cuối cùng ta sẽ đếm xem số lượng sản phẩm bán trong ngày
 
-          Input:
-                fhs_sales_flat_order_item_state: Dataframe
-                threshold_amount: int
-                threshold_month: int
-          Return: 
-                fhs_sales_flat_order_item_state: Dataframe
-          """
+def preprocess_order_item_date(fhs_sales_flat_order_item_state, threshold_amount = 300, threshold_month = 3):
+        """
+        Tiền xử lí với fhs_sales_flat_order_item_state, loại các sản phẩm bán ít hơn 
+        threshold_amount sản phẩm, loại các sản phẩm có thời gian bán ít hơn threshold_month tháng,
+        cuối cùng ta sẽ đếm xem số lượng sản phẩm bán trong ngày
 
-          # Lọc các sản phẩm < threshold_amount đơn trong năm
-          # Đếm số lượng sản phẩm bán theo sku
-          a = fhs_sales_flat_order_item_state.groupby('product_dim.sku').count()
-          a = a.reset_index()
-          a = a.loc[a['fhs_sales_flat_order_item.created_at'] > threshold_amount]
-          i1 = a.set_index('product_dim.sku').index
-          i2 = fhs_sales_flat_order_item_state.set_index('product_dim.sku').index
-          # Lọc sản phẩm
-          fhs_sales_flat_order_item_state \
-                    = fhs_sales_flat_order_item_state.loc[i2.isin(i1)]
+        Input:
+            fhs_sales_flat_order_item_state: Dataframe
+            threshold_amount: int
+            threshold_month: int
+        Return: 
+            fhs_sales_flat_order_item_state: Dataframe
+        """
 
-          # Tiếp tục lọc những sản phẩm có thời gian bán ngắn
+        # Lọc các sản phẩm < threshold_amount đơn trong năm
+        # Đếm số lượng sản phẩm bán theo sku
+        a = fhs_sales_flat_order_item_state.groupby('product_dim.sku').count()
+        a = a.reset_index()
+        a = a.loc[a['fhs_sales_flat_order_item.created_at'] > threshold_amount]
+        i1 = a.set_index('product_dim.sku').index
+        i2 = fhs_sales_flat_order_item_state.set_index('product_dim.sku').index
+        # Lọc sản phẩm
+        fhs_sales_flat_order_item_state \
+                = fhs_sales_flat_order_item_state.loc[i2.isin(i1)]
 
-          # Lấy ngày bán sớm nhất và trễ nhất
-          b = fhs_sales_flat_order_item_state\
-                    .groupby('product_dim.sku')['fhs_sales_flat_order_item.created_at'].agg(['min', 'max'])
-          b = b.reset_index()
-          string_to_datetime(b, 'min')
-          string_to_datetime(b, 'max')
-          days = f'{threshold_month*30} days'
-          b=b.loc[(b['max'] - b['min']) > pd.Timedelta(days)]
-          i1 = b.set_index('product_dim.sku').index
-          i2 = fhs_sales_flat_order_item_state.set_index('product_dim.sku').index
-          # Lọc sản phẩm
-          fhs_sales_flat_order_item_state \
-                    = fhs_sales_flat_order_item_state.loc[i2.isin(i1)]
+        # Tiếp tục lọc những sản phẩm có thời gian bán ngắn
 
-          # Tạo biến count để có thể tính tổng
-          fhs_sales_flat_order_item_state['count'] = 1
+        # Lấy ngày bán sớm nhất và trễ nhất
+        b = fhs_sales_flat_order_item_state\
+                .groupby('product_dim.sku')['fhs_sales_flat_order_item.created_at'].agg(['min', 'max'])
+        b = b.reset_index()
+        string_to_datetime(b, 'min')
+        string_to_datetime(b, 'max')
+        days = f'{threshold_month*30} days'
+        b=b.loc[(b['max'] - b['min']) > pd.Timedelta(days)]
+        i1 = b.set_index('product_dim.sku').index
+        i2 = fhs_sales_flat_order_item_state.set_index('product_dim.sku').index
+        # Lọc sản phẩm
+        fhs_sales_flat_order_item_state \
+                = fhs_sales_flat_order_item_state.loc[i2.isin(i1)]
 
-          # Group by theo ngày và sku, cat để tính tổng sản phẩm bán trong ngày
-          fhs_sales_flat_order_item_state = fhs_sales_flat_order_item_state\
-                    .groupby(['product_dim.sku','product_dim.cat',
-                              fhs_sales_flat_order_item_state['fhs_sales_flat_order_item.created_at'].dt.date])['count'].count()
-          fhs_sales_flat_order_item_state = fhs_sales_flat_order_item_state.reset_index()
-          string_to_datetime(fhs_sales_flat_order_item_state, 'fhs_sales_flat_order_item.created_at')
-          
+        # Tạo biến count để có thể tính tổng
+        fhs_sales_flat_order_item_state['count'] = 1
+
+        # Group by theo ngày và sku, cat để tính tổng sản phẩm bán trong ngày
+        fhs_sales_flat_order_item_state = fhs_sales_flat_order_item_state\
+                .groupby(['product_dim.sku','product_dim.cat',
+                            fhs_sales_flat_order_item_state['fhs_sales_flat_order_item.created_at'].dt.date])['count'].count()
+        fhs_sales_flat_order_item_state = fhs_sales_flat_order_item_state.reset_index()
+        string_to_datetime(fhs_sales_flat_order_item_state, 'fhs_sales_flat_order_item.created_at')
+        
 
 
-          return fhs_sales_flat_order_item_state
+        return fhs_sales_flat_order_item_state
+
+
+def preprocess_order_item_hour(fhs_sales_flat_order_item_state, threshold_amount = 300, threshold_month = 3):
+        """
+        Tiền xử lí với fhs_sales_flat_order_item_state, loại các sản phẩm bán ít hơn 
+        threshold_amount sản phẩm, loại các sản phẩm có thời gian bán ít hơn threshold_month tháng,
+        cuối cùng ta sẽ đếm xem số lượng sản phẩm bán trong ngày
+
+        Input:
+            fhs_sales_flat_order_item_state: Dataframe
+            threshold_amount: int
+            threshold_month: int
+        Return: 
+            fhs_sales_flat_order_item_state: Dataframe
+        """
+
+        # Lọc các sản phẩm < threshold_amount đơn trong năm
+        # Đếm số lượng sản phẩm bán theo sku
+        a = fhs_sales_flat_order_item_state.groupby('product_dim.sku').count()
+        a = a.reset_index()
+        a = a.loc[a['fhs_sales_flat_order_item.created_at'] > threshold_amount]
+        i1 = a.set_index('product_dim.sku').index
+        i2 = fhs_sales_flat_order_item_state.set_index('product_dim.sku').index
+        # Lọc sản phẩm
+        fhs_sales_flat_order_item_state \
+                = fhs_sales_flat_order_item_state.loc[i2.isin(i1)]
+
+        # Tiếp tục lọc những sản phẩm có thời gian bán ngắn
+
+        # Lấy ngày bán sớm nhất và trễ nhất
+        b = fhs_sales_flat_order_item_state\
+                .groupby('product_dim.sku')['fhs_sales_flat_order_item.created_at'].agg(['min', 'max'])
+        b = b.reset_index()
+        string_to_datetime(b, 'min')
+        string_to_datetime(b, 'max')
+        days = f'{threshold_month*30} days'
+        b=b.loc[(b['max'] - b['min']) > pd.Timedelta(days)]
+        i1 = b.set_index('product_dim.sku').index
+        i2 = fhs_sales_flat_order_item_state.set_index('product_dim.sku').index
+        # Lọc sản phẩm
+        fhs_sales_flat_order_item_state \
+                = fhs_sales_flat_order_item_state.loc[i2.isin(i1)]
+
+        # Tạo biến count để có thể tính tổng
+        fhs_sales_flat_order_item_state['count'] = 1
+
+        # Group by theo ngày và sku, cat để tính tổng sản phẩm bán trong ngày
+        fhs_sales_flat_order_item_state = fhs_sales_flat_order_item_state\
+                .groupby(['product_dim.sku','product_dim.cat',
+                            fhs_sales_flat_order_item_state['fhs_sales_flat_order_item.created_at'].dt.strftime('%Y/%m/%d %H:00:00')])['count'].count()
+        
+        fhs_sales_flat_order_item_state = fhs_sales_flat_order_item_state.reset_index()
+        string_to_datetime(fhs_sales_flat_order_item_state, 'fhs_sales_flat_order_item.created_at')
+        
+        return fhs_sales_flat_order_item_state
+
 
 def get_sku_list(fhs_sales_flat_order_item_state):
           """
@@ -147,6 +207,7 @@ def get_sku_list(fhs_sales_flat_order_item_state):
           sku_list = list(set(fhs_sales_flat_order_item_state.groupby('product_dim.sku').count().index))
 
           return sku_list
+
 
 def preprocess_product_dim(product_dim):
           """
@@ -213,14 +274,19 @@ def preprocess_product_dim(product_dim):
           product_dim['product_dim.cat'] = product_dim['product_dim.cat'].str.rstrip(',')
           return product_dim
 
-def create_data_full_year(fhs_sales_flat_order_item_state, sku_list, index):
+
+def create_data_full_year(fhs_sales_flat_order_item_state, sku_list, index, is_date = True, year = 2020,
+        category = None):
         """
         Tạo ra data cho toàn bộ năm trên 1 sku từ index trong sku_list
+        Nếu là ngày thì tạo ra theo từng ngày, nếu không thì tạo ra theo từng giờ
 
         Input: 
             fhs_sales_flat_order_item_state: Dataframe
             sku_list: list []
             index: int
+            is_date: bool
+            year: int
         Return:
             result: Dataframe
         """
@@ -229,10 +295,22 @@ def create_data_full_year(fhs_sales_flat_order_item_state, sku_list, index):
 
         temp = fhs_sales_flat_order_item_state.loc[fhs_sales_flat_order_item_state['product_dim.sku'] == sku]
 
-        category = temp['product_dim.cat'].iat[0]
+        if category == None:
+            category = temp['product_dim.cat'].iat[0]
 
-        datelist = pd.date_range(start='01-01-2020', end='12-31-2020', freq='1d')
+        datelist = None
+
+        if is_date:
+            freq='1d'
+        else: 
+            freq='1H'
+
+        datelist = pd.date_range(start=f'01-01-{year}', end=f'12-31-{year}', freq=freq)
+
         datelist = pd.DataFrame({'date': datelist})
+
+        # Loại ngày thuộc năm nhuận
+        datelist = datelist.loc[datelist['date'] != '29-2-2020']
 
         result = pd.merge(temp, datelist, 
                 left_on='fhs_sales_flat_order_item.created_at',
@@ -245,13 +323,16 @@ def create_data_full_year(fhs_sales_flat_order_item_state, sku_list, index):
 
         return result
           
-def get_epoch_data_k_days(data_full_year, model, day_train = 15, day_predict = 7):
+
+def get_epoch_data_k_days(data_full_year, data_full_last_year, data_same_cat_full_year,
+                        data_diff_cat_full_year, day_train = 15, day_predict = 7):
     """
     Chọn tất cả các ngày trong năm hay có thể gọi là epoch cho từng năm, 
     sau đó trả ra dữ liệu day_train ngày trước đó và dữ liệu day_predict ngày sau là một array 2 chiều
 
     Input:
         data_full_year: Dataframe
+        data_sku_full_year: Dataframe
         model: model sentence to vec vietnamese-sbert
     Return:
         data_array:2D numpy array (x, y). Trong đó x là số ngày trong năm valid có nhãn, 
@@ -267,16 +348,71 @@ def get_epoch_data_k_days(data_full_year, model, day_train = 15, day_predict = 7
     for i in range(len(data_full_year) - offset + 1):
             data_list.append(data_full_year[i:offset + i])
 
+    # Lấy thông tin của đơn hàng năm trước
+    data_previous_list = []
+    offset = day_train + day_predict
+    for i in range(len(data_full_last_year) - offset + 1):
+            data_previous_list.append(data_full_last_year[i:offset + i])
+
+    data_same_cat_list = []
+    offset = day_train + day_predict
+    for i in range(len(data_same_cat_full_year) - offset + 1):
+            data_same_cat_list.append(data_same_cat_full_year[i:offset + i])
+
+    data_diff_cat_list = []
+    offset = day_train + day_predict
+    for i in range(len(data_diff_cat_full_year) - offset + 1):
+            data_diff_cat_list.append(data_diff_cat_full_year[i:offset + i])
+
     # Chuyển dataframe thành array và đưa vào list
     data_array = []
-    for data in data_list:
-            array = format_data(data[:day_train], data[day_train:], model)
+    for data, data_previous, data_same_cat, data_diff_cat \
+            in zip(data_list, data_previous_list, data_same_cat_list, data_diff_cat_list):
+            array = format_data_new(data[:day_train], data[day_train:], data_same_cat[:day_train], 
+                    data_diff_cat[:day_train], data_previous[day_train:])
             data_array.append(array)
 
     # Sau đó đưa về array 2D
     data_array = np.asarray(data_array)
     return data_array
     pass
+
+
+def get_epoch_data_k_hours(data_full_year, model, hour_train = 48, hour_predict = 12):
+    """
+    Chọn tất cả các giờ trong ngày trong năm hay có thể gọi là epoch cho từng năm, 
+    sau đó trả ra dữ liệu hour_train ngày trước đó và dữ liệu hour_predict ngày sau là một array 2 chiều
+
+    Input:
+        data_full_year: Dataframe
+        model: model sentence to vec vietnamese-sbert
+        hour_train: int
+        hour_predict: int
+    Return:
+        data_array:2D numpy array (x, y). Trong đó x là số ngày trong năm valid có nhãn, 
+            y là số chiều 768 + 1 + 1 + 1 + day_train + day_predict = y. 
+            Note: 768 là vector wordembedding, day_train là số ngày dùng để train, 
+            day_predict số ngày dự đoán
+
+    """
+
+    # Lấy từng khoảng gồm day_train + day_predict ngày, với day_train ngày train day_predict ngày dự đoán
+    data_list = []
+    offset = hour_train + hour_predict
+    for i in range(len(data_full_year) - offset + 1):
+            data_list.append(data_full_year[i:offset + i])
+
+    # Chuyển dataframe thành array và đưa vào list
+    data_array = []
+    for data in data_list:
+            array = format_data_hour(data[:hour_train], data[hour_train:], model)
+            data_array.append(array)
+
+    # Sau đó đưa về array 2D
+    data_array = np.asarray(data_array)
+    return data_array
+    pass
+
 
 def random_data_15_days(data_full_year, year):
     """
@@ -309,6 +445,7 @@ def random_data_15_days(data_full_year, year):
 
     return df.iloc[:15], df.iloc[15:]
     pass
+
 
 def format_data(data_k_days, data_l_days, model):
     """
@@ -347,5 +484,90 @@ def format_data(data_k_days, data_l_days, model):
 
     return data
     return data_k_days, data_l_days
+
+    pass
+
+
+def format_data_new(data_k_days, data_l_days, data_same_cat_k_days, data_diff_cat_k_days, data_previous_l_days):
+    """
+    Chuyển data về toàn là số để có thể train dễ dàng
+    Cấu trúc data: data_k_days = (số đơn bán trong k ngày, ngày, tháng, 768 word embedding cho category)
+    Cấu trúc label: data_l_days = (số đơn bán trong l ngày từ kế tiếp)
+
+    Input:
+        data_k_days: Dataframe
+        data_l_days: Dataframe
+        model: model sentence to vec vietnamese-sbert
+    Return:
+        data_k_days: numpy array (768 + k + 1 + 1)
+        data_l_days: numpy array (l)
+    """
+
+    # Lấy max date và bỏ các số lựng bán từng ngày vào 1 list, tiến hành xử lí và lấy các cột cần thiết
+    data_k_days = data_k_days.groupby(['product_dim.sku', 'product_dim.cat'])[['date', 'count']].agg([max, list]).reset_index()
+    data_k_days.columns = ['%s%s' % (a, '|%s' % b if b else '') for a, b in data_k_days.columns]
+    data_k_days = data_k_days.loc[:, ['product_dim.cat', 'date|max','count|list']]
+    data_k_days['day'] = data_k_days['date|max'].dt.day
+    data_k_days['month'] = data_k_days['date|max'].dt.month
+    data_k_days = data_k_days.loc[:, ['product_dim.cat','count|list','day','month']]
+    data_k_days.columns = ['product_dim.cat','sale_k_days','day', 'month']
+
+    # Sau đó chuyển về numpy array
+    sale_k_days = data_k_days['sale_k_days'].apply(np.array)[0]
+    # day = data_k_days['day'].apply(np.array)
+    # month = data_k_days['month'].apply(np.array)
+    # Chỉ lấy thông tin về số lượng bán
+    data_same_cat_k_days = data_same_cat_k_days['count'].to_numpy()
+    data_diff_cat_k_days = data_diff_cat_k_days['count'].to_numpy()
+    data_previous_l_days = data_previous_l_days['count'].to_numpy()
+    data_l_days = data_l_days['count'].to_numpy()
+
+    # data_15_days = np.concatenate((sale_15_days, day, month, vector_sentence), axis = 0)
+    data = np.concatenate((sale_k_days, data_same_cat_k_days, 
+                data_diff_cat_k_days, data_previous_l_days, data_l_days), axis = 0)
+
+    return data
+
+
+def format_data_hour(data_k_hours, data_l_hours, model):
+
+    """
+    Chuyển data về toàn là số để có thể train dễ dàng
+    Cấu trúc data: data_k_hours = (số đơn bán trong k giờ, ngày, tháng, 768 word embedding cho category)
+    Cấu trúc label: data_l_hours = (số đơn bán trong l giờ từ kế tiếp)
+
+    Input:
+        data_k_hours: Dataframe
+        data_l_hours: Dataframe
+        model: model sentence to vec vietnamese-sbert
+    Return:
+        data_k_days: numpy array (768 + k + 1 + 1)
+        data_l_days: numpy array (l)
+    """
+
+    # Lấy max date và bỏ các số lựng bán từng ngày vào 1 list, tiến hành xử lí và lấy các cột cần thiết
+    data_k_hours = data_k_hours.groupby(['product_dim.sku', 'product_dim.cat'])[['date', 'count']].agg([max, list]).reset_index()
+    data_k_hours.columns = ['%s%s' % (a, '|%s' % b if b else '') for a, b in data_k_hours.columns]
+    data_k_hours = data_k_hours.loc[:, ['product_dim.cat', 'date|max','count|list']]
+    data_k_hours['hour'] = data_k_hours['date|max'].dt.hour
+    data_k_hours['day'] = data_k_hours['date|max'].dt.day
+    data_k_hours['month'] = data_k_hours['date|max'].dt.month
+    data_k_hours = data_k_hours.loc[:, ['product_dim.cat','count|list','hour','day','month']]
+    data_k_hours.columns = ['product_dim.cat','sale_k_days','hour','day','month']
+
+    # Sau đó chuyển về numpy array
+    sale_k_days = data_k_hours['sale_k_days'].apply(np.array)[0]
+    hour = data_k_hours['hour'].apply(np.array)
+    day = data_k_hours['day'].apply(np.array)
+    month = data_k_hours['month'].apply(np.array)
+    vector_sentence = model.encode(data_k_hours['product_dim.cat'])[0]
+    # Chỉ lấy thông tin về số lượng bán
+    data_l_hours = data_l_hours['count'].to_numpy()
+
+    # data_15_days = np.concatenate((sale_15_days, day, month, vector_sentence), axis = 0)
+    data = np.concatenate((sale_k_days, hour, day, month, vector_sentence, data_l_hours), axis = 0)
+
+    return data
+    return data_k_hours, data_l_hours
 
     pass
